@@ -23,7 +23,7 @@ def run_flask():
 # 3. Command Handlers
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-  welcome_text = 'Hey Hudson! 👋 I am online, active, and ready to go! 🏁🔥'
+  welcome_text = 'Hello {user_name}! Welcome to Minecraft Myanmar. Please join to our channel and group and let's discuss about minecraft ! Channel = https://t.me/minecraftmyanmar_addrons Group = https://t.me/minecraftmyanmar_chat'
   bot.reply_to(message, welcome_text)
 
 
