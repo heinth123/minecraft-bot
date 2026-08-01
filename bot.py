@@ -20,8 +20,8 @@ def run_flask():
   app.run(host='0.0.0.0', port=port)
 
 
-# 🏁 2. Bot Configuration
-BOT_TOKEN = '8961144422:AAEbEX-xxgi3hhXnHRVCT5g7o5oQPpEaafY'
+# 🏁 2. Bot Configuration (Safely fetched from Render Environment Variables)
+BOT_TOKEN = os.environ.get('BOT_TOKEN')
 bot = telebot.TeleBot(BOT_TOKEN)
 
 # 🛡️ Anti-Spam Tracker: Stores timestamps for each user
