@@ -1,103 +1,53 @@
 import os
-import time
-from collections import defaultdict
-from threading import Thread
+import threading
 from flask import Flask
 import telebot
 
-# 🌐 1. Mini Web Server to satisfy Render's port check
-app = Flask('')
+# 1. Initialize Telegram Bot using Environment Variable
+BOT_TOKEN = os.environ.get('BOT_TOKEN')
+bot = telebot.TeleBot(BOT_TOKEN)
+
+# 2. Initialize Flask Web Server (keeps Render awake!)
+app = Flask(__name__)
 
 
 @app.route('/')
 def home():
-  return 'Bot is alive!'
+  return 'Bot is alive!', 200
 
 
 def run_flask():
-  # Grab Render's required port (defaults to 10000 if not set)
-  port = int(os.environ.get('PORT', 10000))
-  app.run(host='0.0.0.0', port=port)
+  app.run(host='0.0.0.0', port=10000)
 
 
-# 🏁 2. Bot Configuration (Safely fetched from Render Environment Variables)
-BOT_TOKEN = os.environ.get('BOT_TOKEN')
-bot = telebot.TeleBot(BOT_TOKEN)
-
-# 🛡️ Anti-Spam Tracker: Stores timestamps for each user
-user_message_times = defaultdict(list)
-
-
-# 🚨 3. Anti-Spam Check (13 messages under 6 seconds)
-@bot.message_handler(
-    func=lambda message: True, content_types=['text', 'photo', 'sticker', 'doc']
-)
-def anti_spam_check(message):
-  # Ignore channel posts or system updates
-  if not message.from_user:
-    return
-
-  user_id = message.from_user.id
-  chat_id = message.chat.id
-  current_time = time.time()
-
-  # Remove timestamps older than 6 seconds
-  user_message_times[user_id] = [
-      t for t in user_message_times[user_id] if current_time - t <= 6
-  ]
-
-  # Add current message timestamp
-  user_message_times[user_id].append(current_time)
-
-  # If user sends 13 or more messages in 6 seconds -> Mute them!
-  if len(user_message_times[user_id]) >= 13:
-    user_message_times[user_id] = []  # Reset count
-    until_time = int(current_time) + 60  # Mute for 60 seconds (1 minute)
-
-    try:
-      bot.restrict_chat_member(
-          chat_id, user_id, until_date=until_time, can_send_messages=False
-      )
-      bot.reply_to(
-          message,
-          '<b>muted for 1 minute</b>\n<b>reason:</b> spamming detected 🚫',
-          parse_mode='HTML',
-      )
-    except Exception as e:
-      print(f'Failed to mute user: {e}')
-
-
-# 💬 4. Command Handlers
+# 3. /start Command Handler
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-  user_name = message.from_user.first_name
   welcome_text = (
-      f'Hello {user_name}! Welcome to Minecraft Myanmar. Please join to our'
-      " channel and group and let's discuss about minecraft ! Channel ="
-      ' https://t.me/minecraftmyanmar_addrons      Group ='
-      ' https://t.me/minecraftmyanmar_chat'
+      'Hey Hudson! 👋 I am online, active, and ready to race! 🏁🔥\n\nSend me'
+      ' a command or message to get started!'
   )
   bot.reply_to(message, welcome_text)
 
 
-@bot.message_handler(content_types=['new_chat_members'])
-def welcome_new_member(message):
-  for new_member in message.new_chat_members:
-    if new_member.id != bot.get_me().id:
-      group_welcome = (
-          f"Welcome to the group, {new_member.first_name}! Let's discuss about"
-          ' minecraft!'
-      )
-      bot.send_message(message.chat.id, group_welcome)
+# 4. /help Command Handler (Optional extra command)
+@bot.message_handler(commands=['help'])
+def send_help(message):
+  help_text = (
+      'Here are my available commands:\n/start - Start the bot\n/help - Get'
+      ' help info'
+  )
+  bot.reply_to(message, help_text)
 
 
-# 🚀 Start Flask in a background thread FIRST, then start Telegram bot
+# 5. Main Execution Block
 if __name__ == '__main__':
-  # Start Web Server in background thread
-  flask_thread = Thread(target=run_flask)
+  # Start Flask in a background thread
+  flask_thread = threading.Thread(target=run_flask)
   flask_thread.daemon = True
   flask_thread.start()
 
   print('Bot is racing and ready to go! 🏁')
-  # Start Telegram Bot polling
-  bot.infinity_polling()
+
+  # Start listening for Telegram updates (skips old missed messages on startup)
+  bot.infinity_polling(skip_pending_sessions=True)
